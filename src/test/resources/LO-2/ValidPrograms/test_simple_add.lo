@@ -1,0 +1,8 @@
+// User defined test case for simple addition of numbers
+// Should return 11 from SaM compilation
+
+
+int a;
+{
+    a = ((5) + 6);
+}
