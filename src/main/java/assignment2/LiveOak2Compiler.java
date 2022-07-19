@@ -4,6 +4,8 @@ import edu.utexas.cs.sam.io.SamTokenizer;
 import edu.utexas.cs.sam.io.Tokenizer;
 import edu.utexas.cs.sam.io.Tokenizer.TokenType;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.HashMap;
 
@@ -12,7 +14,11 @@ public class LiveOak2Compiler
 	public static void main(String[] args) throws IOException {
 		String fileName = args[0];
 		String pgm = compiler(fileName);
-		//TODO: write out the pgm to the args[1] outfile (or throw except if compiler fails)
+		//write the compiled SaM code to outfile
+		String outFileName = args[1];
+		BufferedWriter writer = new BufferedWriter(new FileWriter(outFileName));
+		writer.write(pgm);
+		writer.close();
 	}
 
 	// setting up the global symbol table for LO-0 and LO-1
@@ -102,15 +108,29 @@ public class LiveOak2Compiler
 		// TODO: validate the word for proper identifier formatting
 		String type = f.getWord(); // Need type error checking for LO-0
 		f.skipToken(); // consume type id
-		if (f.peekAtKind() == TokenType.WORD) // this is the case of identifier with no init
-		{
-			String id = f.getWord();
-			// add to the symbol table as a variable or check it exists
-			if (!symbolTable.containsKey(id)) {
-				int tmpCnt = symbolCount += 1;
-				symbolTable.put(id, tmpCnt);
-				symbolTypeTable.put(id, type);
-			}
+		if (f.peekAtKind() == TokenType.OPERATOR) { // this is the case of var = expr;
+			int addr = symbolTable.get(type);
+			return getExp(f) + "STOREOFF " + addr + "\n";
+		}
+		boolean stop = false;
+		while (!stop) {
+			if (f.peekAtKind() == TokenType.WORD) // this is the case of identifier with no init
+			{
+				String id = f.getWord();
+				// add to the symbol table as a variable or check it exists
+				if (!symbolTable.containsKey(id)) {
+					int tmpCnt = symbolCount += 1;
+					symbolTable.put(id, tmpCnt);
+					symbolTypeTable.put(id, type);
+				}
+				f.skipToken(); // move to next
+				if (f.peekAtKind() == TokenType.CHARACTER) {
+					if (f.getCharacter() == ';') {
+						f.skipToken(); // consume
+						stop = true;
+					}
+				}
+			} // TODO: error handling
 		}
 			return null;
 	}
@@ -120,20 +140,20 @@ public class LiveOak2Compiler
 		switch (ch) {
 			case '(':
 			case '{':
-				f.check(ch); // this should consume paren
+				f.skipToken(); // this should consume paren
 				if (f.peekAtKind() == TokenType.OPERATOR) {
 					// this is the unop case, need to get op
 					return getOperator(f);
 				}
 				return getExp(f);
 			case ')':
-				f.check(ch); // consume ending paren
+				f.skipToken(); // consume ending paren
 				return "";
 			case '}':
-				f.check(ch);
+				f.skipToken();
 				return "STOP"; // should be ending with } brace
 			case '?':
-				f.check(ch);
+				f.skipToken();
 				return getTernaryOp(f);
 			default: return "ERROR\n";
 		}
@@ -151,41 +171,41 @@ public class LiveOak2Compiler
 		char op = f.getOp();
 		switch (op) {
 			case '+':
-				f.check(op); // consume
+				f.skipToken(); // consume
 				 // get next expression to add
 				return getExp(f) + "ADD\n";
 
 			case '-':
-				f.check(op); // consume
+				f.skipToken(); // consume
 				// get next expression to add
 				return getExp(f) + "SUB\n";
 
 			case '*':
-				f.check(op); // consume
+				f.skipToken(); // consume
 				// get next expression to add
 				return getExp(f) + "TIMES\n";
 
 			case '/':
-				f.check(op); // consume
+				f.skipToken(); // consume
 				// get next expression to add
 				return getExp(f) + "DIV\n";
 
 			case '%':
-				f.check(op); // consume
+				f.skipToken(); // consume
 				// get next expression to add
 				return getExp(f) + "MOD\n";
 
 			case '=':
-				f.check(op); // consume
+				f.skipToken(); // consume
 				// TODO: handle var assignment
 				return getAssignment(f);
 
 			case '!':
-				f.check(op); //consume
+				f.skipToken(); //consume
 				return getExp(f) + "NOT\n"; // TODO: this might be bad way to handle NOT operator
 
 			case '~':
-				f.check(op);
+				f.skipToken();
 				return getExp(f); // TODO: handle string reversal
 			default: return "ERROR\n";
 		}
